@@ -2,90 +2,97 @@ from google.adk.agents.callback_context import CallbackContext
 from google.adk.models import LlmResponse
 from google.genai import types
 import os
-from typing import Optional
+from typing import Optional, List, Any, Dict
 from .pricing_engine import PricingEngine
+
+def _calculate_and_format_summary(
+    usage_metadata_list: List[Any], agent_name: str, is_final_summary: bool = False
+) -> Dict[str, Any]:
+    """A shared helper function to perform pricing calculations and formatting."""
+    pricing_models_path = os.path.join(
+        os.path.dirname(__file__), "pricing_models.json"
+    )
+    pricing_engine = PricingEngine(pricing_models_path)
+    
+    summary = pricing_engine.calculate_cost(usage_metadata_list, agent_name)
+    
+    cost = summary.get('total_cost', 0.0)
+    in_ppm = summary.get('input_price_per_million', 0.0)
+    out_ppm = summary.get('output_price_per_million', 0.0)
+    in_tokens = summary.get('total_input_tokens', 0)
+    out_tokens = summary.get('total_output_tokens', 0)
+    total_tokens = in_tokens + out_tokens
+    extrapolated_cost_1k = cost * 1000
+    extrapolated_cost_1m = cost * 1_000_000
+
+    calculation_str = (
+        f"Calculation: (${in_ppm:,.2f}/1M) * {in_tokens} input + "
+        f"(${out_ppm:,.2f}/1M) * {out_tokens} output"
+    )
+
+    if is_final_summary:
+        title = "--- Final Workflow Summary ---"
+        cost_label = "Total Estimated Cost for Workflow"
+        token_label = "Total Tokens for Workflow"
+    else:
+        title = f"--- Pricing Summary for {agent_name} ---"
+        cost_label = "Estimated Cost for this step"
+        token_label = "Total Tokens for this step"
+
+    summary_str = (
+        f"\n\n{title}\n"
+        f"{cost_label}: ${cost:.6f}\n"
+        f"{calculation_str}\n"
+        f"Thousand-run cost: ${extrapolated_cost_1k:.6f}\n"
+        f"Million-run cost: ${extrapolated_cost_1m:.6f}\n"
+    )
+    
+    return {"summary_str": summary_str, "total_tokens": total_tokens}
 
 def add_step_pricing_summary(
     callback_context: CallbackContext, llm_response: LlmResponse
 ) -> LlmResponse:
     """
-    An after_model_callback that calculates the cost for a single agent step,
-    appends a labeled pricing summary as a NEW PART, and writes data to the state.
+    An after_model_callback that uses the shared helper to append a step summary.
     """
     if not llm_response.usage_metadata:
         return llm_response
 
-    pricing_models_path = os.path.join(
-        os.path.dirname(__file__), "pricing_models.json"
-    )
-    pricing_engine = PricingEngine(pricing_models_path)
-    step_summary = pricing_engine.calculate_cost(
+    summary_data = _calculate_and_format_summary(
         [llm_response.usage_metadata], callback_context.agent_name
-    )
-    step_cost_float = step_summary.get('total_cost', 0.0)
-    extrapolated_cost_1k = step_cost_float * 1000
-    extrapolated_cost_1m = step_cost_float * 1_000_000
-
-    step_summary_str = (
-        f"\n\n--- Pricing Summary for {callback_context.agent_name} ---\n"
-        f"Model: {step_summary.get('model_used', 'N/A')}\n"
-        f"Input Tokens for this step: {step_summary.get('total_input_tokens', 0)}\n"
-        f"Output Tokens for this step: {step_summary.get('total_output_tokens', 0)}\n"
-        f"Estimated Cost for this step: ${step_cost_float:.6f}\n"
-        f"Thousand-run cost: ${extrapolated_cost_1k:.6f}\n"
-        f"Million-run cost: ${extrapolated_cost_1m:.6f}\n"
     )
     
     if llm_response.content and llm_response.content.parts:
-        llm_response.content.parts.append(types.Part(text=step_summary_str))
+        llm_response.content.parts.append(types.Part(text=summary_data["summary_str"]))
     else:
-        llm_response.content = types.Content(parts=[types.Part(text=step_summary_str)])
-
-    if "total_tokens_in_workflow" not in callback_context.state:
-        callback_context.state["total_tokens_in_workflow"] = []
-    callback_context.state["total_tokens_in_workflow"].append(
-        step_summary.get('total_tokens', 0)
-    )
+        llm_response.content = types.Content(parts=[types.Part(text=summary_data["summary_str"])])
+    
+    if "workflow_usage" not in callback_context.state:
+        callback_context.state["workflow_usage"] = []
+    callback_context.state["workflow_usage"].append({
+        "agent_name": callback_context.agent_name,
+        "usage_metadata": llm_response.usage_metadata
+    })
 
     return llm_response
 
 def add_final_summary(callback_context: CallbackContext) -> Optional[types.Content]:
     """
-    An after_agent_callback that calculates the total cost of the entire
-    workflow using data from the state, and returns new Content to replace
-    the agent's original output with a final summary.
+    An after_agent_callback that uses the shared helper to create a final summary.
     """
     current_state = callback_context.state.to_dict()
-    total_tokens_list = current_state.get("total_tokens_in_workflow", [])
-    if not total_tokens_list:
+    workflow_usage = current_state.get("workflow_usage", [])
+    if not workflow_usage:
         return None
 
-    total_tokens = sum(total_tokens_list)
+    all_usage_metadata = [step["usage_metadata"] for step in workflow_usage]
 
-    pricing_models_path = os.path.join(
-        os.path.dirname(__file__), "pricing_models.json"
-    )
-    pricing_engine = PricingEngine(pricing_models_path)
-    
-    model_pricing = pricing_engine.pricing_models.get(callback_context.agent_name, {})
-    input_tiers = model_pricing.get("input", [])
-    
-    price_per_million = input_tiers[0].get("price_per_million", 0) if input_tiers else 0
-    total_cost_float = (total_tokens / 1_000_000) * price_per_million
-    extrapolated_cost_1k = total_cost_float * 1000
-    extrapolated_cost_1m = total_cost_float * 1_000_000
-
-    final_summary_str = (
-        "\n\n--- Final Workflow Summary ---\n"
-        f"Total Tokens for Workflow: {total_tokens}\n"
-        f"Total Estimated Cost for Workflow: ${total_cost_float:.6f}\n"
-        f"Thousand-run cost: ${extrapolated_cost_1k:.6f}\n"
-        f"Million-run cost: ${extrapolated_cost_1m:.6f}\n"
+    summary_data = _calculate_and_format_summary(
+        all_usage_metadata, callback_context.agent_name, is_final_summary=True
     )
     
     original_output = current_state.get("output", "")
-    
-    new_output_text = original_output + final_summary_str
+    new_output_text = original_output + summary_data["summary_str"]
     
     return types.Content(
         parts=[types.Part(text=new_output_text)],
