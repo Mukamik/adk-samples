@@ -5,6 +5,13 @@ import os
 from typing import Optional, List, Any, Dict
 from .pricing_engine import PricingEngine
 
+# FIX: Re-introduce the agent-to-model mapping in the code, since it was
+# removed from the pricing_models.json data file.
+AGENT_TO_MODEL = {
+    "video_analyzer": "gemini-2.5-pro",
+    "audio_analyzer": "gemini-2.5-pro",
+}
+
 def _calculate_and_format_summary(
     usage_metadata_list: List[Any], agent_name: str, is_final_summary: bool = False
 ) -> Dict[str, Any]:
@@ -13,9 +20,24 @@ def _calculate_and_format_summary(
         os.path.dirname(__file__), "pricing_models.json"
     )
     pricing_engine = PricingEngine(pricing_models_path)
+
+    # FIX: Look up the model name using the agent-to-model mapping.
+    model_name = AGENT_TO_MODEL.get(agent_name)
     
-    summary = pricing_engine.calculate_cost(usage_metadata_list, agent_name)
-    
+    # FIX: Get discount rate from environment variable, with a default.
+    try:
+        discount_rate = float(os.environ.get("DISCOUNT_RATE", "0.15"))
+    except (ValueError, TypeError):
+        discount_rate = 0.15 # Default if env var is invalid
+
+    if not model_name:
+        # Fallback or error if agent is not mapped
+        summary = {}
+    else:
+        summary = pricing_engine.calculate_cost(
+            usage_metadata_list, model_name, discount_rate=discount_rate
+        )
+
     cost = summary.get('total_cost', 0.0)
     subtotal = summary.get('subtotal', 0.0)
     discount_rate = summary.get('discount_rate', 0.0)
@@ -29,8 +51,8 @@ def _calculate_and_format_summary(
     extrapolated_cost_1m = cost * 1_000_000
 
     calculation_str = (
-        f"Calculation: (${in_ppm:,.2f}/1M) * {in_tokens} input + "
-        f"(${out_ppm:,.2f}/1M) * {out_tokens} output"
+        f"Calculation: (${in_ppm:,.2f}/1M) * {in_tokens} input tokens + "
+        f"(${out_ppm:,.2f}/1M) * {out_tokens} output tokens"
     )
 
     if is_final_summary:
