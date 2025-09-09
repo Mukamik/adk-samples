@@ -14,16 +14,23 @@ class PricingEngine:
         if not tiers: return 0.0, 0.0
         
         price_per_million = 0.0
-        if "up_to_tokens" not in tiers[0]:
-            price_per_million = tiers[0].get("price_per_million", 0)
-        else:
-            sorted_tiers = sorted(tiers, key=lambda x: x['up_to_tokens'] if isinstance(x['up_to_tokens'], int) else float('inf'))
+        # FIX: Handle both up_to_tokens and context_window_tokens for tiered pricing
+        tier_key = None
+        if "up_to_tokens" in tiers[0]:
+            tier_key = "up_to_tokens"
+        elif "context_window_tokens" in tiers[0]:
+            tier_key = "context_window_tokens"
+
+        if tier_key:
+            sorted_tiers = sorted(tiers, key=lambda x: x[tier_key] if isinstance(x[tier_key], int) else float('inf'))
             for tier in sorted_tiers:
-                tier_limit = tier['up_to_tokens']
+                tier_limit = tier[tier_key]
                 if isinstance(tier_limit, str) and tier_limit == 'inf': tier_limit = float('inf')
                 if tokens <= tier_limit:
                     price_per_million = tier.get("price_per_million", 0)
                     break
+        else:
+            price_per_million = tiers[0].get("price_per_million", 0)
         
         cost = (tokens / 1_000_000) * price_per_million
         return cost, price_per_million
@@ -38,8 +45,13 @@ class PricingEngine:
         discount_rate = agent_pricing.get("discount_rate", 0.0)
 
         for metadata in usage_metadata_list:
-            total_input_tokens += metadata.prompt_token_count
-            total_output_tokens += metadata.candidates_token_count
+            # FIX: Handle both UsageMetadata objects and dicts from state
+            if isinstance(metadata, dict):
+                total_input_tokens += metadata.get('prompt_token_count', 0)
+                total_output_tokens += metadata.get('candidates_token_count', 0)
+            else:
+                total_input_tokens += metadata.prompt_token_count
+                total_output_tokens += metadata.candidates_token_count
         
         input_cost, effective_input_price = self._get_price_for_tokens(input_tiers, total_input_tokens)
         output_cost, effective_output_price = self._get_price_for_tokens(output_tiers, total_output_tokens)

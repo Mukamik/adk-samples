@@ -52,7 +52,8 @@ def _calculate_and_format_summary(
         f"Million-run cost: ${extrapolated_cost_1m:.6f}\n"
     )
     
-    return {"summary_str": summary_str, "total_tokens": total_tokens}
+    # Return the raw summary along with the formatted string
+    return {"summary_str": summary_str, "total_tokens": total_tokens, "summary": summary}
 
 def add_step_pricing_summary(
     callback_context: CallbackContext, llm_response: LlmResponse
@@ -74,30 +75,70 @@ def add_step_pricing_summary(
     
     if "workflow_usage" not in callback_context.state:
         callback_context.state["workflow_usage"] = []
+    # FIX: Store the detailed summary for final calculation
     callback_context.state["workflow_usage"].append({
         "agent_name": callback_context.agent_name,
-        "usage_metadata": llm_response.usage_metadata
+        "usage_metadata": llm_response.usage_metadata,
+        "summary": summary_data["summary"]
     })
 
     return llm_response
 
 def add_final_summary(callback_context: CallbackContext) -> Optional[types.Content]:
     """
-    An after_agent_callback that uses the shared helper to create a final summary.
+    An after_agent_callback that aggregates step costs to create a final summary.
     """
     current_state = callback_context.state.to_dict()
     workflow_usage = current_state.get("workflow_usage", [])
     if not workflow_usage:
         return None
 
-    all_usage_metadata = [step["usage_metadata"] for step in workflow_usage]
+    # FIX: Sum the costs from each step instead of recalculating
+    total_cost = 0.0
+    subtotal = 0.0
+    discount_amount = 0.0
+    total_input_tokens = 0
+    total_output_tokens = 0
 
-    summary_data = _calculate_and_format_summary(
-        all_usage_metadata, callback_context.agent_name, is_final_summary=True
+    for step in workflow_usage:
+        step_summary = step.get("summary", {})
+        subtotal += step_summary.get("subtotal", 0.0)
+        discount_amount += step_summary.get("discount_amount", 0.0)
+        total_cost += step_summary.get("total_cost", 0.0)
+        total_input_tokens += step_summary.get("total_input_tokens", 0)
+        total_output_tokens += step_summary.get("total_output_tokens", 0)
+
+    # To calculate the effective discount rate, we need to handle division by zero
+    if subtotal > 0:
+        discount_rate = discount_amount / subtotal
+    else:
+        discount_rate = 0.0
+
+    extrapolated_cost_1k = total_cost * 1000
+    extrapolated_cost_1m = total_cost * 1_000_000
+
+    # The calculation string is tricky since prices can be tiered.
+    # We will show the total tokens and let the per-step summaries show the rates.
+    calculation_str = (
+        f"Calculation: Based on the sum of {len(workflow_usage)} step(s). "
+        f"Total Input: {total_input_tokens}, Total Output: {total_output_tokens}"
     )
-    
+
+    title = "--- Final Workflow Summary ---"
+    cost_label = "Total Estimated Cost for Workflow"
+
+    summary_str = (
+        f"\n\n{title}\n"
+        f"Subtotal: ${subtotal:.6f}\n"
+        f"Discount ({discount_rate:.0%}): -${discount_amount:.6f}\n"
+        f"{cost_label}: ${total_cost:.6f}\n"
+        f"{calculation_str}\n"
+        f"Thousand-run cost: ${extrapolated_cost_1k:.6f}\n"
+        f"Million-run cost: ${extrapolated_cost_1m:.6f}\n"
+    )
+
     original_output = current_state.get("output", "")
-    new_output_text = original_output + summary_data["summary_str"]
+    new_output_text = original_output + summary_str
     
     return types.Content(
         parts=[types.Part(text=new_output_text)],
