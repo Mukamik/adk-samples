@@ -46,5 +46,5 @@ class PricingEngine:
             "total_input_tokens": total_input_tokens,
             "total_output_tokens": total_output_tokens,
             "total_tokens": total_input_tokens + total_output_tokens,
-            "total_cost": f"${total_cost:.6f}"
+            "total_cost": total_cost
         }

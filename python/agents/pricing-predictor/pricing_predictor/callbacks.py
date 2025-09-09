@@ -8,36 +8,27 @@ def add_pricing_summary(
     callback_context: CallbackContext, llm_response: LlmResponse
 ) -> LlmResponse:
     """
-    An after_model_callback that calculates the cost of a single LLM call
-    and appends a pricing summary to the response.
+    An after_model_callback that calculates the cost for a single agent step
+    and appends a labeled pricing summary to the response.
     """
-    all_usage_metadata = []
-    
-    # Get the model name from the agent that was run.
-    # Note: This assumes the agent name in the pricing model matches.
-    # A more robust implementation might map agent names to model names.
-    model_name = callback_context.agent_name
+    if not llm_response.usage_metadata:
+        return llm_response
 
-    # Get the usage metadata from the current LLM response.
-    if llm_response.usage_metadata:
-        all_usage_metadata.append(llm_response.usage_metadata)
-
-    # Calculate the cost.
+    # Calculate the cost for this specific step only.
     pricing_models_path = os.path.join(
         os.path.dirname(__file__), "pricing_models.json"
     )
     pricing_engine = PricingEngine(pricing_models_path)
     pricing_summary = pricing_engine.calculate_cost(
-        all_usage_metadata, model_name
+        [llm_response.usage_metadata], callback_context.agent_name
     )
 
     pricing_summary_str = (
-        "\n\n--- Pricing Summary ---"
-        f"Model: {pricing_summary.get('model_used', 'N/A')}"
-        f"Total Input Tokens: {pricing_summary.get('total_input_tokens', 0)}"
-        f"Total Output Tokens: {pricing_summary.get('total_output_tokens', 0)}"
-        f"Total Tokens: {pricing_summary.get('total_tokens', 0)}"
-        f"Total Estimated Cost: {pricing_summary.get('total_cost', '$0.00')}"
+        f"\n\n--- Pricing Summary for {callback_context.agent_name} ---\n"
+        f"Model: {pricing_summary.get('model_used', 'N/A')}\n"
+        f"Input Tokens: {pricing_summary.get('total_input_tokens', 0)}\n"
+        f"Output Tokens: {pricing_summary.get('total_output_tokens', 0)}\n"
+        f"Estimated Cost for this step: {pricing_summary.get('total_cost', '$0.00')}\n"
     )
 
     # Append the pricing summary as a new part to the final response.
