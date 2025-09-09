@@ -1,0 +1,25 @@
+[project]
+name = "pricing-predictor"
+version = "0.1.0"
+description = "An ADK sample for predicting the cost of agentic workflows."
+authors = [
+    {name = "Aaron Wanjala", email = "aaronmwanjala@google.com"}
+]
+license = "Apache-2.0"
+requires-python = ">=3.10"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+google-adk = "^1.0.0"
+google-cloud-aiplatform = { extras = ["adk"], version = "^1.93.0" }
+google-genai = "^1.9.0"
+pydantic = "^2.10.6"
+python-dotenv = "^1.0.1"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0.0"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"

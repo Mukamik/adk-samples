@@ -1,0 +1,13 @@
+{
+  "gemini-2.5-pro": {
+    "displayName": "Gemini 2.5 Pro",
+    "unit": "token",
+    "input": [
+      { "up_to_tokens": 200000, "price_per_million": 1.25 },
+      { "up_to_tokens": "inf", "price_per_million": 2.50 }
+    ],
+    "output": [
+      { "price_per_million": 3.75 }
+    ]
+  }
+}
