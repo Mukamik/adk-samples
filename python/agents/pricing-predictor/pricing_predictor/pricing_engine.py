@@ -21,30 +21,17 @@ class PricingEngine:
         return 0.0
 
     def calculate_cost(self, usage_metadata_list: List[Any], model_name: str) -> Dict[str, Any]:
-        """Calculates the total cost for a list of usage metadata."""
-        total_input_tokens = 0
-        total_output_tokens = 0
-        total_cost = 0.0
-        
+        total_input_tokens, total_output_tokens, total_cost = 0, 0, 0.0
         model_pricing = self.pricing_models.get(model_name, {})
-        
-        input_tiers = model_pricing.get("input", [])
-        output_tiers = model_pricing.get("output", [])
-
+        input_tiers, output_tiers = model_pricing.get("input", []), model_pricing.get("output", [])
         for metadata in usage_metadata_list:
-            input_tokens = metadata.prompt_token_count
-            output_tokens = metadata.candidates_token_count
-            
+            input_tokens, output_tokens = metadata.prompt_token_count, metadata.candidates_token_count
             total_input_tokens += input_tokens
             total_output_tokens += output_tokens
-            
             total_cost += self._get_tiered_price(input_tiers, input_tokens)
             total_cost += self._get_tiered_price(output_tiers, output_tokens)
-
         return {
-            "model_used": model_name,
-            "total_input_tokens": total_input_tokens,
-            "total_output_tokens": total_output_tokens,
-            "total_tokens": total_input_tokens + total_output_tokens,
-            "total_cost": total_cost
+            "model_used": model_name, "total_input_tokens": total_input_tokens,
+            "total_output_tokens": total_output_tokens, "total_tokens": total_input_tokens + total_output_tokens,
+            "total_cost": total_cost  # Return as a float
         }
