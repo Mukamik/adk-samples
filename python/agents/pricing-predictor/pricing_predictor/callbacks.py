@@ -17,6 +17,9 @@ def _calculate_and_format_summary(
     summary = pricing_engine.calculate_cost(usage_metadata_list, agent_name)
     
     cost = summary.get('total_cost', 0.0)
+    subtotal = summary.get('subtotal', 0.0)
+    discount_rate = summary.get('discount_rate', 0.0)
+    discount_amount = summary.get('discount_amount', 0.0)
     in_ppm = summary.get('input_price_per_million', 0.0)
     out_ppm = summary.get('output_price_per_million', 0.0)
     in_tokens = summary.get('total_input_tokens', 0)
@@ -41,6 +44,8 @@ def _calculate_and_format_summary(
 
     summary_str = (
         f"\n\n{title}\n"
+        f"Subtotal: ${subtotal:.6f}\n"
+        f"Discount ({discount_rate:.0%}): -${discount_amount:.6f}\n"
         f"{cost_label}: ${cost:.6f}\n"
         f"{calculation_str}\n"
         f"Thousand-run cost: ${extrapolated_cost_1k:.6f}\n"

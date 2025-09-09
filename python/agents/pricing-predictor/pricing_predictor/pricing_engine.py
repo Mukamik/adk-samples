@@ -14,7 +14,6 @@ class PricingEngine:
         if not tiers: return 0.0, 0.0
         
         price_per_million = 0.0
-        # If there are no tiers based on token count, use the first price.
         if "up_to_tokens" not in tiers[0]:
             price_per_million = tiers[0].get("price_per_million", 0)
         else:
@@ -30,12 +29,13 @@ class PricingEngine:
         return cost, price_per_million
 
     def calculate_cost(self, usage_metadata_list: List[Any], agent_name: str) -> Dict[str, Any]:
-        total_input_tokens, total_output_tokens, total_cost = 0, 0, 0.0
+        total_input_tokens, total_output_tokens = 0, 0
         
         agent_pricing = self.pricing_models.get(agent_name, {})
         model_name = agent_pricing.get("model", "N/A")
         input_tiers = agent_pricing.get("input", [])
         output_tiers = agent_pricing.get("output", [])
+        discount_rate = agent_pricing.get("discount_rate", 0.0)
 
         for metadata in usage_metadata_list:
             total_input_tokens += metadata.prompt_token_count
@@ -43,13 +43,19 @@ class PricingEngine:
         
         input_cost, effective_input_price = self._get_price_for_tokens(input_tiers, total_input_tokens)
         output_cost, effective_output_price = self._get_price_for_tokens(output_tiers, total_output_tokens)
-        total_cost = input_cost + output_cost
+        
+        subtotal = input_cost + output_cost
+        discount_amount = subtotal * discount_rate
+        total_cost = subtotal - discount_amount
 
         return {
             "model_used": model_name,
             "total_input_tokens": total_input_tokens,
             "total_output_tokens": total_output_tokens,
             "total_tokens": total_input_tokens + total_output_tokens,
+            "subtotal": subtotal,
+            "discount_rate": discount_rate,
+            "discount_amount": discount_amount,
             "total_cost": total_cost,
             "input_price_per_million": effective_input_price,
             "output_price_per_million": effective_output_price,
