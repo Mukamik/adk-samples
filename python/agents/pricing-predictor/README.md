@@ -1,5 +1,7 @@
 # Pricing Predictor
 
+> **Note:** This sample should be taken as a demonstration of how to implement pricing or similar evaluative tasks in your agentic workflows. If you want to re-purpose it for your own workflows, simply keep the `callbacks.py` files, replace the agent and subagents with your own workflow, and preserve the callbacks in `agent.py` and each subagent for automatic tracking.
+
 This agent functions as an automated cost-estimation layer specifically designed to predict and track the approximate costs of agentic workflows that use Large Language Models (LLMs). Its primary role is to bring financial transparency to agent development by systematically analyzing LLM API calls and applying a detailed pricing model to produce a report on projected costs.
 
 ## Overview
@@ -19,14 +21,14 @@ The key features of the Pricing Predictor include:
 | Feature | Description |
 | --- | --- |
 | **Interaction Type** | Workflow |
-| **Complexity**  | Easy |
+| **Complexity**  | Medium |
 | **Agent Type**  | Multi Agent |
 | **Components**  | None |
 | **Vertical**  | Horizontal |
 
 ### Agent architecture:
 
-The `root_agent` is a custom `PricingSequentialAgent` that acts as an orchestrator. It takes a user's request (a video file path) and manages a workflow by calling two specialized sub-agents in sequence. After the workflow is complete, it uses the `PricingEngine` to calculate the total cost.
+The `video_analyzer` is a custom `PricingSequentialAgent` that acts as an orchestrator. It takes a user's request (a video file path) and manages a workflow by calling two specialized sub-agents in sequence. After the workflow is complete, it uses the `PricingEngine` to calculate the total cost.
 
 <img src="https://storage.googleapis.com/gemini-hosted-assets/adk/pricing_predictor_architecture.png" alt="Pricing Predictor Architecture" width="800"/>
 
@@ -94,12 +96,12 @@ adk web
 The command will start a web server on your machine and print the URL. You may open the URL, select an agent from the "Select App" dropdown in the top-left menu, and the UI will appear.
 
 You can choose between two agents:
-1.  **Pricing Predictor**: The main workflow.
-2.  **View Pricing Models**: A simple agent to display the current pricing data.
+1.  **Video Analyzer**: The main workflow.
+2.  **Audio Analyzer**: A simple agent to display the current pricing data.
 
-For the **Pricing Predictor**, you will need to provide:
+For the **Video Analyzer**, you will need to provide:
 
-*   `prompt`: The question you want to ask about the video (e.g., "is there a dog in this video?", "what color is the car?").
+*   `prompt`: The question you want to ask about the video (e.g., "Are there any cats in this video?").
 *   `video_file_path`: The **absolute path** to a video file on your local machine.
 
 ### Example Interaction
@@ -143,7 +145,7 @@ The Pricing Predictor can be customized to better suit your requirements. For ex
 
 1.  **Substitute the Agent Workflow:** Modify the `sub_agents` list in `pricing_predictor/agent.py` to call your own sequence of agents.
 2.  **Customize Pricing Models:** Modify the `pricing_predictor/pricing_models.json` file to define pricing for different models or to add your own tiered pricing based on prompt size.
-3.  **Enhance the Orchestrator:** The `PricingSequentialAgent` in `orchestrator.py` can be extended to handle more complex logic, such as passing different media types between steps or adding conditional logic.
+3.  **Enhance the Callbacks:** The logic in `callbacks.py` can be extended to handle more complex logic. You can pass state back and forth between agents with `callback_context`. See the [documentation](https://google.github.io/adk-docs/sessions/state/#how-state-is-updated-recommended-methods) for more details.
 
 ## Disclaimer
 
