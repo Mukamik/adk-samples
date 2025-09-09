@@ -1,4 +1,5 @@
 from google.adk import Agent
+from ..callbacks import add_pricing_summary
 
 audio_agent = Agent(
     name="audio_analyzer",
@@ -8,4 +9,5 @@ audio_agent = Agent(
         "Your task is to analyze the audio of the same video to provide additional details that complement the video analysis."
     ),
     model="gemini-2.5-pro",
+    after_model_callback=add_pricing_summary,
 )

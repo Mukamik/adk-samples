@@ -1,5 +1,3 @@
-from .agent import animal_detector_workflow
-
-root_agent = animal_detector_workflow
+from .agent import root_agent
 
 __all__ = ["root_agent"]
