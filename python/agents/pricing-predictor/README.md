@@ -1,6 +1,10 @@
+> [!WARNING]
+> **Pricing estimated with this approach is only appropriate to be used as a
+> broad initial estimate and is not a guarantee of actual billing costs.**
+
 # Pricing Predictor
 
-> **Note:** This sample should be taken as a demonstration of how to implement pricing or similar evaluative tasks in your agentic workflows. If you want to re-purpose it for your own workflows, simply keep the `callbacks.py` files, replace the agent and subagents with your own workflow, and preserve the callbacks in `agent.py` and each subagent for automatic tracking.
+> **Note:** This sample should be taken as a demonstration of how to pass information like token usage between agents, models or steps in your agentic workflows. If you want to re-purpose it for your own workflows, simply keep the `callbacks.py` files, replace the agent and subagents with your own workflow, and preserve the callbacks in `agent.py` and each subagent for automatic tracking.
 
 This agent functions as an automated cost-estimation layer specifically designed to predict and track the approximate costs of agentic workflows that use Large Language Models (LLMs). Its primary role is to bring financial transparency to agent development by systematically analyzing LLM API calls and applying a detailed pricing model to produce a report on projected costs.
 
